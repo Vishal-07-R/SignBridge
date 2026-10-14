@@ -41,8 +41,19 @@ async def list_signs(
     return [SignResponse.model_validate(s) for s in signs]
 
 
+@router.get("/languages")
+async def list_sign_languages() -> list[dict[str, str]]:
+    """Retrieve supported languages for vocabulary glossing."""
+    return [
+        {"code": "en", "name": "English", "native_name": "English"},
+        {"code": "hi", "name": "Hindi", "native_name": "हिन्दी"},
+        {"code": "isl", "name": "Indian Sign Language", "native_name": "भारतीय सांकेतिक भाषा"},
+    ]
+
+
 @router.get("/{sign_id}", response_model=SignResponse)
 async def get_sign(
+
     sign_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
 ) -> SignResponse:

@@ -13,7 +13,7 @@ from sqlalchemy.orm import selectinload
 from app.core.config import Settings
 from app.core.rate_limit import clear_rate_limits
 from app.core.security import generate_csrf_token, generate_secure_token, hash_password, hash_token
-from app.db.seed import seed_roles_and_permissions
+from app.db.seed import seed_demo_vocabulary, seed_roles_and_permissions
 from app.db.session import AsyncSessionLocal
 from app.main import create_app
 from app.models.user import Role, User, UserPreference, UserSession
@@ -53,7 +53,9 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Provide a database session per test."""
     async with AsyncSessionLocal() as session:
         await seed_roles_and_permissions(session)
+        await seed_demo_vocabulary(session)
         yield session
+
 
 
 @pytest.fixture

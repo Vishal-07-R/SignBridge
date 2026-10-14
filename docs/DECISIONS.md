@@ -87,4 +87,30 @@
   - **Full UI Integration**: Delivered all 19 defined pages in `frontend/src/pages/` with consistent header navigation, hash-based routing, and the three primary action buttons prominently displayed ("Start Translating", "Open Camera", "Upload Video").
 - **Consequences**: Complete end-to-end avatar pipeline operational immediately, with clean drop-in readiness for production `.glb` assets without rewriting UI or playback control architecture.
 
+---
+
+## ADR 0007: Text-to-ISL Rule-Based Translation Pipeline and Honesty Constraints
+
+- **Status**: Accepted
+- **Date**: 2026-10-14
+- **Context**: Translating English and Hindi natural language into Indian Sign Language (ISL) requires mapping spoken language syntax into ISL's visual-gestural structure. Crucially, ISL grammar is not English word order; it features Topic-Comment structure, Subject-Object-Verb (SOV) canonical order, Time-first framing, and post-predicate/clause-final negation and wh-question positioning. Honesty Rule 5 strictly prohibits using LLMs or vector search as a substitute for verified sign mapping and requires that all rule-based grammatical reorderings be explicitly flagged "needs linguist review". Honesty Rule 2 strictly prohibits inventing or hallucinating signs for unsupported words.
+- **Decision**:
+  - **Linguistic Pipeline Architecture**: Created modular pipeline in `backend/app/services/linguistics/`:
+    1. `normalizer.py`: Unicode NFKC normalization, contraction expansion, punctuation isolation, English copula/article stopword filtering ("is", "are", "am", "a", "the" are omitted as ISL does not sign them), and Hindi-to-ISL concept mapping.
+    2. `lemmatizer.py`: Deterministic inflection reduction mapping plurals, past tenses, continuous forms, and pronouns to canonical root glosses.
+    3. `phrase_matcher.py`: Greedy phrase-first matcher (e.g. "thank you" -> `THANK_YOU`, "sign language" -> `SIGN`) ensuring multi-word idioms are prioritized over single-token fragmentation.
+    4. `grammar_engine.py`: Deterministic rule transforms:
+       - `RULE_FILTER_COPULAS_ARTICLES`: Copula/article omission.
+       - `RULE_TIME_FIRST`: Temporal adverbials repositioned to clause head.
+       - `RULE_SOV_ORDER`: Transitive Subject-Verb-Object reordered to Subject-Object-Verb.
+       - `RULE_NEGATION_FINAL`: Negators repositioned to clause end/post-predicate.
+       - `RULE_WH_QUESTION_FINAL`: Interrogative question words positioned at clause end.
+       - Every applied rule attaches mandatory audit metadata: `{"rule_id": "...", "description": "...", "linguist_notes": "needs linguist review"}`.
+    5. `pipeline.py`: Coordinates database lookup against `SignVocabulary`, identifies unsupported words, computes coverage metrics (`total_tokens`, `supported_tokens`, `unsupported_tokens`, `coverage_percentage`), and creates persistent `Translation` and `TranslationSegment` records.
+  - **Honesty Rule 2 Enforcement**: Any unrecognized word produces an explicit `is_supported=False` segment, is listed in `coverage.unsupported_tokens`, causes the avatar to hold a neutral rest pose with a warning badge, and triggers an explicit UI alert. Signs are never invented.
+  - **User Feedback & Quality Loop**: Added `POST /api/v1/translate/{id}/feedback` and `TranslationFeedbackModal` enabling users and linguists to submit 1-5 star ratings and error classifications (`wrong_sign`, `bad_grammar`, `unrecognized`, `timing`, `other`) stored in `translation_feedback`.
+  - **Bidirectional Workspace Integration**: Connected both `TextToIslPage` and `WorkspacePage` to the live translation API.
+- **Consequences**: Transparent, reproducible, rule-based linguistic translation with zero hallucinated signs, complete honesty compliance, and an active linguist review feedback loop.
+
+
 

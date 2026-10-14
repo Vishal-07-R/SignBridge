@@ -79,11 +79,19 @@ async def get_current_session(
     return session
 
 
+async def get_optional_user(
+    session: UserSession | None = Depends(get_optional_session),
+) -> User | None:
+    """Return User if session is authenticated, otherwise None."""
+    return session.user if session else None
+
+
 async def get_current_user(
     session: UserSession = Depends(get_current_session),
 ) -> User:
     """Return the User associated with the authenticated session."""
     return session.user
+
 
 
 async def get_current_active_user(
