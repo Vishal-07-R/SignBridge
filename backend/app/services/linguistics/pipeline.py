@@ -1,8 +1,7 @@
 """End-to-end Text-to-ISL translation pipeline coordinator."""
 
 import uuid
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -180,7 +179,7 @@ async def translate_text_to_isl(
     ]
 
     translation_id = uuid.uuid4()
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
 
     # 7. Persistence
     if save_history and db is not None:

@@ -57,7 +57,6 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
-
 @pytest.fixture
 def app(test_settings: Settings) -> FastAPI:
     """Create test application instance."""
