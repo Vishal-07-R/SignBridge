@@ -51,6 +51,8 @@ export function getRouteFromHash(hash: string): PageRoute {
       return route as PageRoute;
     }
   }
+  if (cleanHash === '#/camera-recognition' || cleanHash === '#/camera') return 'camera';
+  if (cleanHash === '#/video-recognition' || cleanHash === '#/video-rec') return 'video-rec';
   if (cleanHash.startsWith('#/admin/vocabulary')) return 'admin-vocabulary';
   if (cleanHash.startsWith('#/admin/datasets')) return 'admin-datasets';
   if (cleanHash.startsWith('#/admin/audit')) return 'admin-audit';

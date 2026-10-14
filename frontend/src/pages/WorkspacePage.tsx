@@ -12,7 +12,9 @@ import {
 import { AvatarViewer } from '../components/avatar/AvatarViewer.tsx';
 import { normalizeSignKey } from '../components/avatar/clipMapper.ts';
 import { translateText } from '../api/translation.ts';
-
+import { recognizeLandmarkSequence } from '../api/recognition.ts';
+import { LandmarkTracker } from '../services/recognition/landmarkTracker.ts';
+import { TemporalFrameBuffer } from '../services/recognition/temporalBuffer.ts';
 
 export function WorkspacePage() {
   // Mode: 'split' | 'avatar-only' | 'camera-only'
@@ -22,24 +24,75 @@ export function WorkspacePage() {
   // Left side: Camera / Recognition State
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraPermission, setCameraPermission] = useState<'idle' | 'granted' | 'denied'>('idle');
-  const [recognizedText, setRecognizedText] = useState('HELLO FRIEND');
-  const [recognizedConfidence] = useState(0.92);
+  const [recognizedText, setRecognizedText] = useState('');
+  const [recognizedConfidence, setRecognizedConfidence] = useState(0.85);
   const [manualCorrection, setManualCorrection] = useState('');
   const [isLandmarkOverlay, setIsLandmarkOverlay] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
-  // Right side: Text to Avatar State
-  const [inputText, setInputText] = useState('Hello friend welcome');
-  const [avatarGlosses, setAvatarGlosses] = useState<string[]>(['HELLO', 'FRIEND', 'WELCOME']);
-  const [translationStatus, setTranslationStatus] = useState<string>('Ready');
+  const trackerRef = useRef<LandmarkTracker>(new LandmarkTracker());
+  const temporalBufferRef = useRef<TemporalFrameBuffer>(new TemporalFrameBuffer(30));
+  const lastInferenceRef = useRef<number>(0);
+
+  useEffect(() => {
+    trackerRef.current.initialize();
+  }, []);
+
+  const processWorkspaceFrame = () => {
+    if (!videoRef.current || !canvasRef.current || !isCameraActive) {
+      if (isCameraActive) animationFrameRef.current = requestAnimationFrame(processWorkspaceFrame);
+      return;
+    }
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    if (video.readyState >= 2) {
+      const now = performance.now();
+      const landmarks = trackerRef.current.detect(video, now);
+      if (landmarks) {
+        temporalBufferRef.current.push(landmarks);
+        trackerRef.current.drawOverlay(canvas, landmarks, isLandmarkOverlay);
+
+        if (now - lastInferenceRef.current > 1500 && temporalBufferRef.current.size() >= 15) {
+          lastInferenceRef.current = now;
+          recognizeLandmarkSequence(temporalBufferRef.current.getFrames(), undefined, 'en')
+            .then((res) => {
+              if (res.is_recognized && res.prediction) {
+                setRecognizedConfidence(res.prediction.confidence);
+                setRecognizedText((prev) => {
+                  const words = prev.trim().split(/\s+/).filter(Boolean);
+                  if (words.length === 0 || words[words.length - 1] !== res.prediction!.gloss) {
+                    return prev ? `${prev} ${res.prediction!.gloss}` : res.prediction!.gloss;
+                  }
+                  return prev;
+                });
+              }
+            })
+            .catch(() => {});
+        }
+      }
+    }
+
+    animationFrameRef.current = requestAnimationFrame(processWorkspaceFrame);
+  };
 
   // Handle camera toggle
   const toggleCamera = async () => {
     if (isCameraActive) {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
       }
       setIsCameraActive(false);
       return;
@@ -48,19 +101,27 @@ export function WorkspacePage() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: 640, height: 480 },
+        audio: false,
       });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        videoRef.current.play().catch(() => {});
       }
       setIsCameraActive(true);
       setCameraPermission('granted');
+      animationFrameRef.current = requestAnimationFrame(processWorkspaceFrame);
     } catch {
       setCameraPermission('denied');
       setIsCameraActive(false);
     }
   };
+
+  // Right side: Text to Avatar State
+  const [inputText, setInputText] = useState('Hello friend welcome');
+  const [avatarGlosses, setAvatarGlosses] = useState<string[]>(['HELLO', 'FRIEND', 'WELCOME']);
+  const [translationStatus, setTranslationStatus] = useState<string>('Ready');
+
 
   // Clean up camera on unmount
   useEffect(() => {
@@ -212,13 +273,17 @@ export function WorkspacePage() {
                     autoPlay
                     playsInline
                     muted
-                    className="w-full h-full object-cover mirror"
+                    className="w-full h-full object-cover transform -scale-x-100"
+                  />
+                  <canvas
+                    ref={canvasRef}
+                    width={640}
+                    height={480}
+                    className="absolute inset-0 w-full h-full object-cover pointer-events-none transform -scale-x-100"
                   />
                   {isLandmarkOverlay && (
-                    <div className="absolute inset-0 pointer-events-none border-2 border-dashed border-cyan-500/30 flex items-center justify-center">
-                      <span className="px-2 py-1 rounded bg-black/70 text-cyan-400 text-[10px] font-mono">
-                        DEBUG: Landmark Mesh Overlay Active
-                      </span>
+                    <div className="absolute top-2 right-2 pointer-events-none px-2 py-0.5 rounded bg-black/70 text-cyan-400 text-[10px] font-mono border border-cyan-800">
+                      DEBUG: 21 Landmarks
                     </div>
                   )}
                 </>
