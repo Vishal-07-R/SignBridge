@@ -42,7 +42,10 @@ export const ROUTE_HASH_MAP: Record<PageRoute, string> = {
 };
 
 export function getRouteFromHash(hash: string): PageRoute {
-  const cleanHash = hash.split('?')[0].toLowerCase();
+  let cleanHash = hash.split('?')[0].toLowerCase();
+  if (cleanHash.startsWith('#') && !cleanHash.startsWith('#/')) {
+    cleanHash = '#/' + cleanHash.slice(1);
+  }
   for (const [route, path] of Object.entries(ROUTE_HASH_MAP)) {
     if (path === cleanHash) {
       return route as PageRoute;

@@ -53,7 +53,6 @@ async def list_sign_languages() -> list[dict[str, str]]:
 
 @router.get("/{sign_id}", response_model=SignResponse)
 async def get_sign(
-
     sign_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
 ) -> SignResponse:

@@ -19,11 +19,11 @@ class VideoProcessingJob(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     __tablename__ = "video_processing_jobs"
 
-    user_id: Mapped[uuid.UUID] = mapped_column(
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         index=True,
-        nullable=False,
+        nullable=True,
     )
     job_type: Mapped[str] = mapped_column(
         String(30), nullable=False
@@ -37,4 +37,4 @@ class VideoProcessingJob(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Relationships
-    user: Mapped[User] = relationship("User", back_populates="video_jobs")
+    user: Mapped[User | None] = relationship("User", back_populates="video_jobs")

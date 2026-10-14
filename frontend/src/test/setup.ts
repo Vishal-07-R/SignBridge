@@ -72,3 +72,21 @@ if (typeof HTMLCanvasElement !== 'undefined') {
     return originalGetContext.call(this, contextType, ...args);
   };
 }
+
+// Polyfill URL.createObjectURL and revokeObjectURL for media uploads in jsdom
+if (typeof URL !== 'undefined') {
+  if (typeof URL.createObjectURL === 'undefined') {
+    Object.defineProperty(URL, 'createObjectURL', {
+      writable: true,
+      value: () => 'blob:http://localhost:5173/mock-object-url',
+    });
+  }
+  if (typeof URL.revokeObjectURL === 'undefined') {
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      writable: true,
+      value: () => {},
+    });
+  }
+}
+
+

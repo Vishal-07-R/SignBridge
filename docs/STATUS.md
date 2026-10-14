@@ -37,22 +37,45 @@
     - `LinguisticBreakdown.tsx`: Interactive linguistic inspector visualizing normalized tokens, applied grammar rules with "needs linguist review" badges, and ordered sign sequence.
     - `WorkspacePage.tsx`: Connected right channel ("Text to ISL") directly to the translation API.
     - `translation.ts`: Typed API client for translation, language listing, and feedback.
+- **Stage 5 Document OCR and Video Audio Transcription Pipeline**:
+  - **Secure Media Uploads & File Validation (`backend/app/services/media/validator.py`)**: Strict magic-byte sniffing (PNG, JPEG, WebP, PDF, MP4, WebM) and size thresholds (15MB document/image, 100MB video) with atomic temp file lifecycle.
+  - **Tesseract 5 OCR & PDF Parsing (`backend/app/services/media/ocr.py`)**: Dual-engine document processing using native `pypdf` text layer extraction with rasterization fallback via `/usr/bin/pdftoppm` and `/usr/bin/tesseract` (English `eng` and Hindi `hin`). Fully protected against command injection with explicit argument lists.
+  - **Honesty Rule 1 Blank/Unreadable Rejection**: Empty or unreadable images trigger an explicit HTTP 422 Unprocessable Content exception ("No readable text detected in document or image. Please verify image clarity, contrast, and orientation.") rather than hallucinating text.
+  - **Video Audio Extraction & Whisper Transcription (`backend/app/services/media/video.py`)**:
+    - Invokes `/usr/bin/ffmpeg` via explicit argument lists to probe streams and extract 16kHz mono audio (zero shell interpolation).
+    - Detects audio-less videos and flags them with `status: "no_audio_stream"` to guide users towards visual ISL sign recognition.
+    - Transcribes spoken audio into timestamped segments using `faster-whisper` (int8 quantized `tiny` model on CPU).
+    - Pinned `av>=11.0.0,<14.0.0` in `backend/pyproject.toml` to guarantee compatibility with `faster-whisper`'s internal audio container decoder.
+  - **Asynchronous Background Jobs & User Data Isolation (`backend/app/services/media/job_manager.py`)**:
+    - Relational job tracking in `video_processing_jobs` table with states (`queued`, `processing` %, `completed`, `failed`, `cancelled`).
+    - Real-time client polling (`GET /api/v1/jobs/{id}`), cancellation (`POST /api/v1/jobs/{id}/cancel`), and retry (`POST /api/v1/jobs/{id}/retry`).
+    - Enforced strict user data isolation so users can only manage their own jobs, with nullable `user_id` for guest conversions.
+  - **API Endpoints & Schemas (`backend/app/api/v1/endpoints/translate.py` & `jobs.py`)**:
+    - `POST /api/v1/translate/image`: Document/image upload returning OCR text, metadata, and optional immediate ISL translation.
+    - `POST /api/v1/translate/video`: Video upload dispatching background transcription job.
+    - `POST /api/v1/translate/segment`: Re-translates single edited transcript segments without re-processing entire videos.
+    - `GET /api/v1/jobs/{job_id}`, `POST /api/v1/jobs/{job_id}/cancel`, `POST /api/v1/jobs/{job_id}/retry`.
+  - **Frontend Media Pages & Controls**:
+    - `ImageToIslPage.tsx`: Drag-and-drop dropzone, image/PDF preview with multi-page selector, Tesseract OCR trigger, editable transcript area with live word/char counters, linguistic inspector, and direct translation playback on the 3D avatar.
+    - `VideoToIslPage.tsx`: Video dropzone with size validation, HTML5 video preview with closed-caption overlay toggle, audio-less video guidance banner linking to `#video-recognition`, real-time progress bar, cancel/retry job controls, synchronized timeline with time cues, inline controlled segment editing, and WebVTT (`.vtt`) subtitle download.
+    - `media.ts`: Typed API client for upload, OCR, polling, cancellation, retries, and segment re-translation.
 - **Test Suites & Verification**:
-  - Backend: 37/37 tests passing 100% across 10 test suites (`backend/tests/test_translation.py` verified with 10 comprehensive tests).
-  - Frontend: 24/24 tests passing 100% across 3 test suites with Vitest (`frontend/src/__tests__/TextToIsl.test.tsx` verified with 7 tests).
+  - Backend: 44/44 tests passing 100% across 11 test suites (`backend/tests/test_media_pipeline.py` verified with 7 comprehensive tests).
+  - Frontend: 30/30 tests passing 100% across 4 test suites with Vitest (`frontend/src/__tests__/MediaToIsl.test.tsx` verified with 6 tests).
   - Production Build: `npm --prefix frontend run build` completes with 0 TypeScript and 0 build errors.
-  - Chromium Browser Verification (`scripts/verify_stage4_browser.py`): Executed on Desktop (1280x800), Tablet (768x1024), and Mobile (375x667) viewports. Verified 0 console errors, 0 page errors, successful translation API round-trips, phrase-first idiom mapping, Hindi translation, Honesty Rule 2 unsupported warnings for UNICORN, feedback submission, and two-way workspace translation. 7 screenshots saved in `docs/screenshots/stage-4/`.
+  - Chromium Browser Verification (`scripts/verify_stage5_browser.py`): Executed on Desktop (1280x800), Tablet (768x1024), and Mobile (375x667) viewports. Verified 0 console errors, 0 page errors, successful OCR extraction, Honesty Rule 1 unreadable rejection notice, video upload & background job processing, synchronized transcript timeline, responsive viewports, and avatar playback. 5 screenshots saved in `docs/screenshots/stage-5/`.
 
 ## WORKS BUT NEEDS EXTERNAL ASSET OR SERVICE
 - **Rigged Humanoid 3D Asset (`avatar.glb`)**: The avatar viewer currently operates with a procedurally rigged development fallback mesh (`DevFallbackAvatar.tsx`) carrying an explicit `DEV FALLBACK RIG` watermark badge. Drop-in location `frontend/public/assets/models/avatar.glb` requires a production humanoid GLTF 2.0 asset conforming to the specifications in `docs/AVATAR_ASSETS.md` (ARKit 52 facial blendshapes, 5-finger articulated skeleton, neutral rest pose).
 - **Certified ISL Motion Capture Animation Clips**: Animation clips currently utilize procedural joint kinematics for demo signs. Production requires studio motion capture or certified keyframe clips reviewed by an ISL linguist or Deaf native signer.
+- **Production Speech-to-Text Model**: Video transcription currently runs on `faster-whisper` `tiny` (int8 CPU) for local execution without GPU requirements. Production deployment benefits from `small`/`medium` models or Indian-accent fine-tuned checkpoints.
+- **Regional Indian Language OCR**: Document OCR supports English (`eng`) and Hindi (`hin`). Additional regional languages (Tamil, Telugu, Bengali, Kannada) require downloading corresponding Tesseract traineddata packages.
 - **Production Mail Delivery & S3 Storage**: Currently utilizing local Mailpit SMTP (`localhost:1025`) and local MinIO; production requires external SMTP provider and production S3 bucket configuration.
 
 ## UNFINISHED
-- Stage 5: OCR and video transcription to ISL (secure uploads, magic-byte checks, Tesseract OCR, ffmpeg audio extraction, faster-whisper transcription, sync timeline, async background jobs).
 - Stage 6: Camera ISL landmark recognition to text (MediaPipe in browser, temporal buffer, model-serving interface).
 - Stage 7: Admin dashboards, audit logging, vocabulary versioning, and security audits.
 - Stage 8: Full test suites, production Docker, and deployment verification.
 
 ## EXACT NEXT TASK
-Stage 5: OCR and video transcription to ISL pipeline. Await Casper's confirmation before creating branch `stage-5-ocr-video`, writing plan artifact, and implementing secure document/image OCR (Tesseract) and video audio transcription (ffmpeg + faster-whisper).
+Stage 6: Camera ISL landmark recognition to text (Direction B: ISL to Text). Await Casper's confirmation before creating branch `stage-6-camera-recog`, writing plan artifact, and implementing browser MediaPipe landmark extraction, debug visualization overlay, temporal buffer windowing, and the ISL recognition model-serving interface.

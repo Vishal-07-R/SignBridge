@@ -112,5 +112,22 @@
   - **Bidirectional Workspace Integration**: Connected both `TextToIslPage` and `WorkspacePage` to the live translation API.
 - **Consequences**: Transparent, reproducible, rule-based linguistic translation with zero hallucinated signs, complete honesty compliance, and an active linguist review feedback loop.
 
+---
+
+## ADR 0008: Document OCR and Video Audio Transcription Pipeline with Background Jobs and Honesty Compliance
+
+- **Status**: Accepted
+- **Date**: 2026-10-14
+- **Context**: Ingesting scanned documents, photos of text, and video files with spoken audio to translate their contents into Indian Sign Language (ISL) animations. External tools (`tesseract`, `pdftoppm`, `ffmpeg`) and heavy inference models (`faster-whisper`) must run safely without blocking synchronous web workers or introducing command-injection vulnerabilities. Furthermore, Honesty Rule 1 mandates that unreadable or blank media must never hallucinate text, and Honesty Rule 6 mandates that jobs never report fake completion or fabricated results.
+- **Decision**:
+  - **Magic-Byte Sniffing & File Validation**: Added `backend/app/services/media/validator.py` performing strict header signature checks (PNG, JPEG, WebP, PDF, MP4, WebM) and hard size limits (15MB document/image, 100MB video) with atomic temp file lifecycles.
+  - **Command Injection Prevention**: All invocations of `/usr/bin/tesseract`, `/usr/bin/pdftoppm`, and `/usr/bin/ffmpeg` pass arguments as explicit lists of strings (`subprocess.run(cmd, shell=False)`), preventing shell interpolation and argument injection.
+  - **OCR Engine & Honesty Rule 1**: Implemented `backend/app/services/media/ocr.py` using native PDF text extraction with rasterization fallback via `pdftoppm` and Tesseract 5 (`eng`, `hin`). If the resulting text is empty or unreadable, the endpoint raises HTTP 422 with a descriptive notice ("No readable text detected in document or image") rather than hallucinating content.
+  - **Asynchronous Background Jobs**: Video transcription runs as asynchronous background tasks tracked in PostgreSQL table `video_processing_jobs` (`job_type="transcription"`). Statuses transition through `queued` -> `processing` (with % progress) -> `completed` / `failed` / `cancelled`. Endpoints `GET /jobs/{id}`, `POST /jobs/{id}/cancel`, and `POST /jobs/{id}/retry` enforce server-side user data isolation.
+  - **Audio-less Video Routing**: `ffmpeg` probes video streams; if no audio stream exists, the job reports `status: "no_audio_stream"`. The UI immediately surfaces an explicit banner directing the user to `#video-recognition` if this is a video of an individual signing.
+  - **Audio Extraction & Whisper Transcription**: Spoken audio is extracted to 16kHz mono WAV and transcribed with `faster-whisper` (`tiny` int8 model on CPU). PyAV is pinned to `av>=11.0.0,<14.0.0` in `pyproject.toml` to guarantee compatibility with faster-whisper's internal container decoder.
+  - **Segment-Synchronized Timeline & Inline Editing**: Resulting transcript segments map to ISL gloss sequences via the Stage 4 linguistic pipeline. The frontend (`VideoToIslPage.tsx`) renders interactive time cues, HTML5 video preview with closed-caption overlay, avatar sizing controls, inline segment editing with `POST /api/v1/translate/segment` re-translation, and WebVTT caption download.
+- **Consequences**: Scalable, non-blocking media translation pipeline operating with zero shell injection risks, strict honesty compliance, and responsive user feedback across viewports.
+
 
 

@@ -7,7 +7,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.translation import Translation, TranslationFeedback, TranslationSegment
+from app.models.translation import Translation, TranslationFeedback
 from app.models.user import User
 
 
@@ -55,7 +55,11 @@ async def test_normalization_and_copula_omission(
 
     # Grammar rules must reflect copula/article omission with Honesty Rule 5 notice
     copula_rule = next(
-        (r for r in data["grammar_rules_applied"] if r["rule_id"] == "RULE_FILTER_COPULAS_ARTICLES"),
+        (
+            r
+            for r in data["grammar_rules_applied"]
+            if r["rule_id"] == "RULE_FILTER_COPULAS_ARTICLES"
+        ),
         None,
     )
     assert copula_rule is not None
@@ -63,9 +67,7 @@ async def test_normalization_and_copula_omission(
 
 
 @pytest.mark.asyncio
-async def test_phrase_first_matching(
-    async_client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_phrase_first_matching(async_client: AsyncClient, db_session: AsyncSession) -> None:
     """Verify multi-word idioms are matched as single ISL glosses before word fragmentation."""
     res = await async_client.post(
         "/api/v1/translate/text",
@@ -141,7 +143,6 @@ async def test_isl_grammar_reordering_rules(
         r for r in data_sov["grammar_rules_applied"] if r["rule_id"] == "RULE_SOV_ORDER"
     )
     assert sov_rule["linguist_notes"] == "needs linguist review"
-
 
 
 @pytest.mark.asyncio
