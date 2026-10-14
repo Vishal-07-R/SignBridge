@@ -10,3 +10,14 @@ build/
 .agent/memory.json
 /storage/
 /tmp-uploads/
+
+# AI agent / tool folders
+.agent/
+.agents/
+.gemini/
+.antigravity/
+.claude/
+.cursor/
+.windsurf/
+.vscode/
+.idea/
