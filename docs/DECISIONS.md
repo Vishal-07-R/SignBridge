@@ -71,3 +71,20 @@
   - Database schema enforces integrity fields: `is_reviewed`, `review_status`, and `linguist_notes` across `sign_vocabulary` and `sign_reviews`.
 - **Consequences**: Strict honesty compliance guaranteed at data and API boundaries.
 
+---
+
+## ADR 0006: 3D Avatar Rendering Pipeline, Dev Fallback Rig, and Honesty Rule Compliance
+
+- **Status**: Accepted
+- **Date**: 2026-10-14
+- **Context**: Real-time 3D avatar visualization is required for Direction A (Text/Media to ISL). Production motion-captured humanoid `.glb` models with ARKit 52 facial blendshapes and linguist-certified sign clips are pending studio capture. Honesty Rules 1, 2, and 8 mandate that we never invent gestures, never pretend missing assets exist, explicitly flag unverified signs with an unsupported notice, and provide a clearly labeled DEMO fallback while documenting exact asset specifications.
+- **Decision**:
+  - **3D Engine**: Integrated Three.js (`three@^0.162.0`), React Three Fiber (`@react-three/fiber@^8.18.0`), and `@react-three/drei@^9.122.0` pinned for React 18 compatibility.
+  - **Clip Mapper & Dictionary**: Implemented `clipMapper.ts` with strict validation. Seeded signs (`HELLO`, `THANK_YOU`, `PLEASE`, `WATER`, etc.) map to timed clips; any unknown or unverified gloss triggers an explicit "Unsupported Sign" status (Honesty Rule 2) and halts the avatar in neutral rest pose rather than inventing gestures.
+  - **Procedural Dev Fallback Rig**: Created `DevFallbackAvatar.tsx`, a procedurally rigged humanoid mesh with head, eyes, brows, neck, torso, shoulders, arms, wrists, and all 5 articulated fingers per hand running kinematic easing curves for demo gestures.
+  - **Honesty Rule 8 Transparency**: Rendered an unobtrusive `DEV FALLBACK RIG` watermark badge and interactive `AssetDocModal` documenting target drop-in location (`frontend/public/assets/models/avatar.glb`) and formal specifications in `docs/AVATAR_ASSETS.md`.
+  - **Controls & Accessibility**: Provided comprehensive transport controls (play, pause, step, replay, scrubber with sign cues), speed options (0.5x, 0.75x, 1x, 1.25x, 1.5x, 2x), camera presets (Front, Upper Body, Hands zoom), reduced motion mode, and responsive layout across Desktop, Tablet, and Mobile.
+  - **Full UI Integration**: Delivered all 19 defined pages in `frontend/src/pages/` with consistent header navigation, hash-based routing, and the three primary action buttons prominently displayed ("Start Translating", "Open Camera", "Upload Video").
+- **Consequences**: Complete end-to-end avatar pipeline operational immediately, with clean drop-in readiness for production `.glb` assets without rewriting UI or playback control architecture.
+
+
