@@ -42,3 +42,32 @@
   - Automation scripts use explicit `#!/usr/bin/env bash` shebangs.
   - Browser verification utilizes the local Chromium binary at `/usr/bin/chromium` with fake media stream flags for automated testing.
 - **Consequences**: Seamless operation on the host system without shell syntax errors or environment discrepancies.
+
+---
+
+## ADR 0004: Authentication, Session Management, and CSRF Architecture
+
+- **Status**: Accepted
+- **Date**: 2026-10-14
+- **Context**: Authentication requires resilient defense against credential stuffing, session hijacking, cross-site scripting (XSS), and cross-site request forgery (CSRF). Password storage must resist GPU cracking.
+- **Decision**:
+  - **Password Hashing**: Implemented Argon2id via `argon2-cffi` (`time_cost=2`, `memory_cost=102400` KiB, `parallelism=8`), meeting OWASP password storage recommendations.
+  - **Session Management**: Opaque random cryptographically secure 256-bit session tokens stored as SHA-256 hashes in PostgreSQL (`user_sessions`). Delivered to browser via `HttpOnly`, `SameSite=Lax`, `Secure` (in production) cookies (`signbridge_session`).
+  - **CSRF Defense**: Dual-token pattern. A non-HttpOnly CSRF token (`signbridge_csrf`) is issued alongside the session. All mutating requests (POST, PUT, PATCH, DELETE) require an `X-CSRF-Token` header matching the HMAC-SHA256 authenticated secret tied to the active session.
+  - **Rate Limiting**: Redis-backed sliding-window rate limiting on sensitive routes (`/login`, `/register`, `/forgot-password`, `/reset-password`) with automatic in-memory fallback.
+  - **Authorization**: RBAC enforced at endpoint level via FastAPI dependencies (`require_role`, `require_permission`). Admin creation is strictly restricted to CLI (`python -m app.cli create-admin`) with no public self-elevation.
+- **Consequences**: High resistance to token theft and CSRF attacks without relying on vulnerable client-side storage for JWTs.
+
+---
+
+## ADR 0005: ISL Seed Integrity and Honesty Constraints
+
+- **Status**: Accepted
+- **Date**: 2026-10-14
+- **Context**: Project rules strictly prohibit fabricating sign language accuracy, vocabulary coverage, or claiming unverified recognition.
+- **Decision**:
+  - All initial ISL vocabulary seeded in the database are explicitly flagged with `is_demo=True`, `is_reviewed=False`, and `linguist_notes="Demo seed - needs linguist review"`.
+  - Non-existent or unreviewed signs must explicitly return an "unsupported sign" response rather than improvising or hallucinating gestures.
+  - Database schema enforces integrity fields: `is_reviewed`, `review_status`, and `linguist_notes` across `sign_vocabulary` and `sign_reviews`.
+- **Consequences**: Strict honesty compliance guaranteed at data and API boundaries.
+
