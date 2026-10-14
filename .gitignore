@@ -1,15 +1,51 @@
+# Environment variables
 .env
 .env.*
 !.env.example
-node_modules/
+
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
 .venv/
+venv/
+ENV/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+coverage/
+.coverage
+htmlcov/
+*.egg-info/
 dist/
 build/
-*.pyc
-.agent/memory.json
+
+# Node & Frontend
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+frontend/coverage/
+.vite/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local storage and test media
 /storage/
 /tmp-uploads/
+postgres_data/
+redis_data/
+minio_data/
+
+# OS and Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
 
 # AI agent / tool folders
 .agent/
@@ -19,5 +55,3 @@ build/
 .claude/
 .cursor/
 .windsurf/
-.vscode/
-.idea/
