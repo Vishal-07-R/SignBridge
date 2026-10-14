@@ -129,5 +129,23 @@
   - **Segment-Synchronized Timeline & Inline Editing**: Resulting transcript segments map to ISL gloss sequences via the Stage 4 linguistic pipeline. The frontend (`VideoToIslPage.tsx`) renders interactive time cues, HTML5 video preview with closed-caption overlay, avatar sizing controls, inline segment editing with `POST /api/v1/translate/segment` re-translation, and WebVTT caption download.
 - **Consequences**: Scalable, non-blocking media translation pipeline operating with zero shell injection risks, strict honesty compliance, and responsive user feedback across viewports.
 
+---
+
+## ADR 0009: ISL to Text Landmark Recognition, Temporal Windowing, and Model-Serving Interface
+
+- **Status**: Accepted
+- **Date**: 2026-10-14
+- **Context**: Building Direction B (ISL to Text) requires real-time webcam sign recognition, landmark spatial tracking, temporal sequence windowing, and batch signing video analysis. In strict adherence to Honesty Rules 1, 3, 4, and 8, MediaPipe landmark extraction is NOT ISL recognition (it is a spatial debug coordinate overlay), arbitrary ISL recognition must not be claimed, an explicit DEMO fallback must be labelled, and gestures falling below confidence thresholds must strictly emit "Sign not recognized" rather than hallucinating sentences.
+- **Decision**:
+  - **Model-Serving Interface & Tensor Contract**: Created `backend/app/services/recognition/model_interface.py` defining `ISLRecognitionModelInterface` with standard tensor contract `(batch_size, sequence_length, 75)` ($N \times 30 \times 75$ normalized spatial coordinates relative to mid-shoulder origin) and metadata endpoint `GET /api/v1/recognize/model-info`.
+  - **Heuristic Demo Recognition Engine**: Implemented `DemoRuleBasedSequenceModel` (`v0.1.0-demo`) evaluating spatial geometry (wrist elevation, finger extensions/curls, trajectory velocity, bilateral proximity) across the 12 seeded vocabulary items. Any gesture falling below 0.60 confidence strictly returns `is_recognized=False` and `"Sign not recognized with certainty"` (Honesty Rules 1 & 4).
+  - **In-Browser Landmark Extraction**: Integrated MediaPipe Tasks Vision (`landmarkTracker.ts`) running on `requestAnimationFrame`. Created debug canvas overlay displaying hand skeletal connections and pose anchors alongside an explicit disclosure badge: `"DEBUG OVERLAY - NOT SIGN RECOGNITION"`.
+  - **Sliding Temporal Buffer**: Implemented `TemporalFrameBuffer` maintaining 15-30 frames, calculating kinetic motion velocities, and dispatching sequences to `POST /api/v1/recognize/landmarks`.
+  - **Uploaded Video Sequence Recognition**: Created asynchronous background job worker `process_video_recognition_job` sampling frames with FFmpeg argument lists at configurable rates (10, 15, 30 FPS) and batch sizes (16, 32, 64 frames). Relational tracking in `video_processing_jobs` (`job_type="recognition"`) strictly enforces server-side user data isolation. Results support inline segment editing, JSON export, and WebVTT caption download.
+  - **Camera Lifecycle & Privacy**: Explicit explanatory user consent before camera initialization (`navigator.mediaDevices.getUserMedia`), clear recording indicators, zero background streaming, and hardware track release on stop.
+  - **Two-Way Workspace Integration**: Connected Direction B camera vision with Direction A 3D avatar rendering on `WorkspacePage.tsx`.
+  - **Honesty Documentation**: Published `docs/ISL_RECOGNITION_LIMITATIONS.md` recording supported signs, tested operational limits, tensor dimensions, and production ONNX/TorchScript integration steps.
+- **Consequences**: Robust, honest, reproducible computer vision pipeline with transparent model disclosures, complete privacy protection, and drop-in integration readiness for production ML models.
+
 
 

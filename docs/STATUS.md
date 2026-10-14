@@ -59,13 +59,36 @@
     - `ImageToIslPage.tsx`: Drag-and-drop dropzone, image/PDF preview with multi-page selector, Tesseract OCR trigger, editable transcript area with live word/char counters, linguistic inspector, and direct translation playback on the 3D avatar.
     - `VideoToIslPage.tsx`: Video dropzone with size validation, HTML5 video preview with closed-caption overlay toggle, audio-less video guidance banner linking to `#video-recognition`, real-time progress bar, cancel/retry job controls, synchronized timeline with time cues, inline controlled segment editing, and WebVTT (`.vtt`) subtitle download.
     - `media.ts`: Typed API client for upload, OCR, polling, cancellation, retries, and segment re-translation.
-- **Test Suites & Verification**:
-  - Backend: 44/44 tests passing 100% across 11 test suites (`backend/tests/test_media_pipeline.py` verified with 7 comprehensive tests).
-  - Frontend: 30/30 tests passing 100% across 4 test suites with Vitest (`frontend/src/__tests__/MediaToIsl.test.tsx` verified with 6 tests).
-  - Production Build: `npm --prefix frontend run build` completes with 0 TypeScript and 0 build errors.
-  - Chromium Browser Verification (`scripts/verify_stage5_browser.py`): Executed on Desktop (1280x800), Tablet (768x1024), and Mobile (375x667) viewports. Verified 0 console errors, 0 page errors, successful OCR extraction, Honesty Rule 1 unreadable rejection notice, video upload & background job processing, synchronized transcript timeline, responsive viewports, and avatar playback. 5 screenshots saved in `docs/screenshots/stage-5/`.
+- **Stage 6 Camera ISL Landmark Recognition to Text (Direction B)**:
+  - **Versioned Model-Serving Interface & Contract (`backend/app/services/recognition/`)**:
+    - `model_interface.py`: Abstract interface `ISLRecognitionModelInterface` with standard tensor contract `(batch_size, sequence_length, 75)` and metadata reporting.
+    - `demo_model.py`: Heuristic geometric sequence recognizer `DemoRuleBasedSequenceModel` (`v0.1.0-demo`) evaluating spatial metrics across the 12 seeded vocabulary items. Any gesture scoring below 0.60 confidence strictly returns `is_recognized=False` and message `"Sign not recognized with certainty"` (Honesty Rules 1, 2, 4, and 8).
+    - `video_pipeline.py`: Asynchronous background video processor sampling frames via FFmpeg argument lists (configurable 10, 15, 30 FPS) with batch windowing (16, 32, 64 frames). Enforces server-side user data isolation in `video_processing_jobs` (`job_type="recognition"`).
+  - **API Endpoints & Schemas (`backend/app/api/v1/endpoints/recognize.py`)**:
+    - `GET /api/v1/recognize/model-info`: Returns model ID, version, demo flag, 12 supported signs, tensor shape, and operational limitations.
+    - `POST /api/v1/recognize/landmarks` & `POST /api/v1/recognize/signs`: Real-time landmark sequence inference.
+    - `POST /api/v1/recognize/video`: Upload signing video, dispatches background recognition worker.
+    - `GET /api/v1/recognize/video/{job_id}`: Polls job status, progress percentage, and timestamped segments.
+    - `POST /api/v1/recognize/video/{job_id}/cancel`: Cancels running video recognition job.
+  - **In-Browser Landmark Extraction & Temporal Buffer**:
+    - `landmarkTracker.ts`: In-browser MediaPipe Tasks Vision tracker extracting 21 hand landmarks and pose anchors, rendering debug canvas overlay with prominent Honesty Rule 4 disclosure banner: `"DEBUG OVERLAY - NOT SIGN RECOGNITION"`.
+    - `temporalBuffer.ts`: Sliding temporal window buffer maintaining 15-30 frames, calculating kinetic motion velocities to trigger throttled inference requests.
+    - `recognition.ts`: Typed frontend API client.
+  - **Interactive Recognition Pages & Two-Way Workspace**:
+    - `CameraRecognitionPage.tsx`: Explicit explanatory permission flow, fake media stream support, hardware stream release on stop, landmark overlay toggle, confidence gauge, temporal queue visualization, transcription accumulation, manual correction editing, Web Speech API TTS, and "Supported Signs & Limitations" modal.
+    - `VideoRecognitionPage.tsx`: Signing video dropzone with size validation, extraction parameters (FPS / batch size), live progress bar, recognized segment breakdown with inline gloss editing, and JSON/WebVTT export.
+    - `WorkspacePage.tsx`: Two-way split screen connecting live camera recognition channel (Direction B) with 3D avatar rendering channel (Direction A).
+  - **Documentation Artifacts**:
+    - `docs/ISL_RECOGNITION_LIMITATIONS.md`: Exhaustive documentation of 12 supported signs, tested operational limits, tensor format `(batch, 30, 75)`, and production deep learning model integration roadmap.
+    - `docs/DECISIONS.md`: Recorded ADR 0009.
+  - **Verification & Test Suite**:
+    - Backend: 52/52 tests passing 100% across 12 test suites (`backend/tests/test_recognition.py` verified with 8 comprehensive tests).
+    - Frontend: 38/38 tests passing 100% across 5 test suites with Vitest (`frontend/src/__tests__/CameraAndVideoRecognition.test.tsx` verified with 8 tests).
+    - Production Build: `npm --prefix frontend run build` completes with 0 TypeScript and 0 build errors.
+    - Chromium Browser Automation (`scripts/verify_stage6_browser.py`): Executed with `--use-fake-device-for-media-stream` and `--use-fake-ui-for-media-stream` across Desktop, Tablet, and Mobile. Verified camera permission flow, denied permission error handling, live stream rendering, landmark overlay toggle, manual correction, model specs modal, video sequence recognition, and two-way workspace. 8 screenshots saved in `docs/screenshots/stage-6/`.
 
 ## WORKS BUT NEEDS EXTERNAL ASSET OR SERVICE
+- **Production Trained ISL Sequence ML Model**: Current sequence recognition operates via a geometric heuristic model (`DemoRuleBasedSequenceModel` `v0.1.0-demo`) covering the 12 seeded vocabulary items. Production deployment requires an ONNX or PyTorch sequence model (e.g. ST-GCN or Transformer) trained on native Deaf ISL signers conforming to the tensor contract in `docs/ISL_RECOGNITION_LIMITATIONS.md`.
 - **Rigged Humanoid 3D Asset (`avatar.glb`)**: The avatar viewer currently operates with a procedurally rigged development fallback mesh (`DevFallbackAvatar.tsx`) carrying an explicit `DEV FALLBACK RIG` watermark badge. Drop-in location `frontend/public/assets/models/avatar.glb` requires a production humanoid GLTF 2.0 asset conforming to the specifications in `docs/AVATAR_ASSETS.md` (ARKit 52 facial blendshapes, 5-finger articulated skeleton, neutral rest pose).
 - **Certified ISL Motion Capture Animation Clips**: Animation clips currently utilize procedural joint kinematics for demo signs. Production requires studio motion capture or certified keyframe clips reviewed by an ISL linguist or Deaf native signer.
 - **Production Speech-to-Text Model**: Video transcription currently runs on `faster-whisper` `tiny` (int8 CPU) for local execution without GPU requirements. Production deployment benefits from `small`/`medium` models or Indian-accent fine-tuned checkpoints.
@@ -73,9 +96,8 @@
 - **Production Mail Delivery & S3 Storage**: Currently utilizing local Mailpit SMTP (`localhost:1025`) and local MinIO; production requires external SMTP provider and production S3 bucket configuration.
 
 ## UNFINISHED
-- Stage 6: Camera ISL landmark recognition to text (MediaPipe in browser, temporal buffer, model-serving interface).
 - Stage 7: Admin dashboards, audit logging, vocabulary versioning, and security audits.
 - Stage 8: Full test suites, production Docker, and deployment verification.
 
 ## EXACT NEXT TASK
-Stage 6: Camera ISL landmark recognition to text (Direction B: ISL to Text). Await Casper's confirmation before creating branch `stage-6-camera-recog`, writing plan artifact, and implementing browser MediaPipe landmark extraction, debug visualization overlay, temporal buffer windowing, and the ISL recognition model-serving interface.
+Stage 7: Dashboards, Admin and Security (branch `stage-7-admin-security`). Await Casper's confirmation before creating the branch, writing the plan artifact, and implementing user history/saved signs, admin overview analytics, vocabulary CRUD with versioning/rollback, dataset import processing, and security auditing.
