@@ -26,20 +26,44 @@ class Settings(BaseSettings):
     FRONTEND_PORT: int = 5173
 
     # CORS
-    CORS_ORIGINS: list[str] = [
+    CORS_ORIGINS: list[str] | str = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:3000",
     ]
 
-    @field_validator("CORS_ORIGINS", mode="before")
+    @field_validator("CORS_ORIGINS", mode="after")
     @classmethod
     def assemble_cors_origins(cls, v: Any) -> list[str]:
-        if isinstance(v, str) and not v.startswith("["):
+        if isinstance(v, str):
+            if v.startswith("[") and v.endswith("]"):
+                import json
+
+                try:
+                    return json.loads(v)
+                except Exception:
+                    pass
             return [i.strip() for i in v.split(",") if i.strip()]
         elif isinstance(v, list):
-            return v
+            return [str(i) for i in v]
         return []
+
+    # Authentication & Session Security
+    SESSION_COOKIE_NAME: str = "signbridge_session"
+    SESSION_EXPIRE_DAYS: int = 7
+    CSRF_COOKIE_NAME: str = "signbridge_csrf"
+    SECURE_COOKIES: bool = False  # Set to True in HTTPS production
+    EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24
+    PASSWORD_RESET_EXPIRE_HOURS: int = 1
+
+    # Rate Limiting
+    RATE_LIMIT_LOGIN_PER_MINUTE: int = 5
+    RATE_LIMIT_REGISTER_PER_MINUTE: int = 3
+    RATE_LIMIT_FORGOT_PASSWORD_PER_MINUTE: int = 3
+
+    # Optional One-time Bootstrap Admin (Controlled)
+    BOOTSTRAP_ADMIN_EMAIL: str | None = None
+    BOOTSTRAP_ADMIN_PASSWORD: str | None = None
 
     # Database (PostgreSQL 16)
     POSTGRES_USER: str = "signbridge"
