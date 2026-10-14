@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { AvatarViewer } from '../components/avatar/AvatarViewer.tsx';
 import { normalizeSignKey } from '../components/avatar/clipMapper.ts';
+import { translateText } from '../api/translation.ts';
+
 
 export function WorkspacePage() {
   // Mode: 'split' | 'avatar-only' | 'camera-only'
@@ -70,22 +72,28 @@ export function WorkspacePage() {
   }, []);
 
   // Handle Text to ISL submission
-  const handleTranslateText = () => {
+  const handleTranslateText = async () => {
     if (!inputText.trim()) return;
 
-    // Simple rule-based tokenizer for demo
-    const tokens = inputText
-      .trim()
-      .split(/\s+/)
-      .map((w) => normalizeSignKey(w));
-
-    setAvatarGlosses(tokens);
-    setTranslationStatus(`Generated sequence of ${tokens.length} signs.`);
+    try {
+      const response = await translateText({ text: inputText.trim(), source_language: 'en' });
+      setAvatarGlosses(response.reordered_glosses);
+      setTranslationStatus(`Generated ${response.reordered_glosses.length} ISL signs (${response.coverage.coverage_percentage}% coverage).`);
+    } catch {
+      // Fallback
+      const tokens = inputText
+        .trim()
+        .split(/\s+/)
+        .map((w) => normalizeSignKey(w));
+      setAvatarGlosses(tokens);
+      setTranslationStatus(`Generated sequence of ${tokens.length} signs.`);
+    }
 
     if (sharedTranscript) {
       setRecognizedText(inputText);
     }
   };
+
 
   // TTS audio playback
   const handleTTS = (text: string) => {

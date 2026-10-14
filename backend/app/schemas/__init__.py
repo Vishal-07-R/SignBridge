@@ -16,15 +16,34 @@ from app.schemas.user import (
     VerifyEmailRequest,
 )
 
+from app.schemas.translation import (
+    CoverageMetricsSchema,
+    GrammarRuleAppliedSchema,
+    SupportedLanguageResponse,
+    TextTranslationRequest,
+    TextTranslationResponse,
+    TranslationFeedbackCreate,
+    TranslationFeedbackResponse,
+    TranslationSegmentSchema,
+)
+
 __all__ = [
     "AdminOverviewResponse",
     "AuditLogResponse",
+    "CoverageMetricsSchema",
     "ForgotPasswordRequest",
+    "GrammarRuleAppliedSchema",
     "LoginResponse",
     "ResetPasswordRequest",
     "RoleResponse",
     "SignAnimationAssetResponse",
     "SignResponse",
+    "SupportedLanguageResponse",
+    "TextTranslationRequest",
+    "TextTranslationResponse",
+    "TranslationFeedbackCreate",
+    "TranslationFeedbackResponse",
+    "TranslationSegmentSchema",
     "UserLoginRequest",
     "UserPreferenceResponse",
     "UserPreferenceUpdate",
@@ -33,3 +52,4 @@ __all__ = [
     "UserSessionResponse",
     "VerifyEmailRequest",
 ]
+
